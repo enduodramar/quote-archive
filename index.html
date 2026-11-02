@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quote Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rozha+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <div class="logo">Quote Tracker</div>
+  <div class="nav">
+    <button class="active" onclick="page('checker',this)">Check Quote</button>
+    <button onclick="page('history',this)">Quote History</button>
+    <button onclick="page('backup',this)">Backup</button>
+  </div>
+</nav>
+
+<main class="container">
+
+<section id="checker" class="page active">
+  <h1>Check Before You Post</h1>
+  <p class="sub">Paste a quote to check whether you've already posted it.</p>
+  <div class="card">
+    <label>Quote</label>
+    <textarea id="checkText" placeholder="Paste or type the quote you're about to post..."></textarea>
+    <div class="buttons">
+      <button class="btn primary" onclick="checkQuote()">Check Quote</button>
+      <button class="btn secondary" onclick="clearCheck()">Clear</button>
+    </div>
+    <div id="checkResult" class="result"></div>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 10px">After Posting</h2>
+    <p class="sub" style="font-size:13px;margin-bottom:15px">Once you've posted a new quote, save it here so future checks can detect it.</p>
+    <button class="btn secondary" onclick="goAddFromCheck()">Save This Quote as Posted</button>
+  </div>
+</section>
+
+<section id="history" class="page">
+  <h1>Quote History</h1>
+  <p class="sub">Your recorded Instagram quotes.</p>
+  <div class="stats">
+    <div class="stat"><div class="num" id="total">0</div><div class="lbl">Total Quotes</div></div>
+    <div class="stat"><div class="num" id="month">0</div><div class="lbl">This Month</div></div>
+    <div class="stat"><div class="num" id="categories">0</div><div class="lbl">Categories</div></div>
+  </div>
+  <div class="card">
+    <input class="search" id="search" placeholder="Search quote, author, category..." oninput="displayHistory()">
+    <button class="btn primary" onclick="openAdd()">Add Posted Quote</button>
+  </div>
+  <div id="historyList"></div>
+</section>
+
+
+
+<section id="backup" class="page">
+  <h1>Backup</h1>
+  <p class="sub">Your quote history is stored in this browser. Export a backup periodically.</p>
+  <div class="card">
+    <h3>Export</h3><p class="small" style="color:#888;font-size:12px">Downloads your recorded quotes as a JSON backup.</p>
+    <button class="btn primary" onclick="exportData()">Export Quotes</button>
+  </div>
+  <div class="card">
+    <h3>Import</h3><input type="file" id="importFile" accept=".json">
+    <button class="btn primary" onclick="importData()">Import Quotes</button>
+  </div>
+  <div class="card"><h3>Delete Everything</h3><button class="btn danger" onclick="deleteAll()">Delete All Quotes</button></div>
+</section>
+</main>
+
+<div class="modal" id="addModal">
+  <div class="modalbox">
+    <div class="modalhead"><h2 style="margin:0">Add Posted Quote</h2><button class="close" onclick="closeAdd()">×</button></div>
+    <label>Quote *</label><textarea id="addQuote"></textarea><label>Author</label><input id="addAuthor">
+    <label>Date Posted *</label><input type="date" id="addDate"><label>Category</label><input id="addCategory">
+    <label>Instagram Link (optional)</label><input id="addInstagram">
+    <div class="buttons"><button class="btn primary" onclick="addQuote()">Save Quote</button><button class="btn secondary" onclick="closeAdd()">Cancel</button></div>
+  </div>
+</div>
+
+<div class="modal" id="editModal">
+  <div class="modalbox">
+    <div class="modalhead"><h2 style="margin:0">Edit Quote</h2><button class="close" onclick="closeEdit()">×</button></div>
+    <input type="hidden" id="editId"><label>Quote *</label><textarea id="editQuote"></textarea>
+    <label>Author</label><input id="editAuthor"><label>Date Posted *</label><input type="date" id="editDate">
+    <label>Category</label><input id="editCategory"><label>Instagram Link</label><input id="editInstagram">
+    <div class="buttons"><button class="btn primary" onclick="saveEdit()">Save Changes</button><button class="btn secondary" onclick="closeEdit()">Cancel</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TEMPLATE="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAQ4BDgDASIAAhEBAxEB/8QAHAABAQADAQEBAQAAAAAAAAAAAAEEBQYHAwII/8QARBABAQACAgEBAwYLBQYFBQAAABEBAgMEBRIGITEHE0FRgbEUFRciNmFxc5Oh0TJUVaPBQlKRkrLwFiMzcuEkJSZTYv/EABsBAQEAAgMBAAAAAAAAAAAAAAABAwQCBQYH/8QAOREBAAEDAQQFCgQGAwAAAAAAAAECAxEEBSExURITQWFxFSIygZGhscHR8BQ0UnIGMzVCouEkVPH/2gAMAwEAAhEDEQA/APwA8O+lgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoCIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKACgiCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgKAiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKKIiCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgAoIgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoAKIIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKACwgiCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwAFERBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQAUREFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAUAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABRRBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQAUREFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAIRQRIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIKAoCIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoQiIBCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABCABAH6CERAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIAooiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKACgiCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgAoiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAooiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKACiIgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCiiIgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCgCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKKIiCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgLCAjiQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQAFFERBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQFARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFhFERIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIKAoCIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAooiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAoQggEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEIAEAfoBEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWEBEIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIQAIAD9BCI4gQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQgAQBRRBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQAURxQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBYRRESEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASEUBIRQEhFASCgAoiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAooIgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoALCIiCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwBRYREQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWAAoiIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAoCIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACwiiIkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkIoCQigJCKAkFAUBEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUWEQQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWEBBYQEFhAQWAAoIgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoCCgIKAgoALCIiCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwgILCAgsICCwAFERBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQAUEQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFAQUBBQEFM5xjFzmAgmvJptma7Yzlc5xri5zjBgA1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";
+let quotes=JSON.parse(localStorage.getItem("quoteTrackerData")||"[]");
+const bg=new Image(), canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d"),holder=document.getElementById("canvasHolder");
+bg.onload=render;bg.src=TEMPLATE;
+
+let marks=true;
+let quoteX=540, quoteY=510;
+let dragging=false, dragOffsetX=0, dragOffsetY=0;
+
+function page(id,btn){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active");if(id==="history")displayHistory();updateStats();window.scrollTo({top:0,behavior:"smooth"})}
+function today(){let d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function normalize(s){return(s||"").toLowerCase().trim().replace(/[“”"‘’']/g,"").replace(/[.,!?;:()[\]{}]/g,"").replace(/\s+/g," ")}
+function findDuplicate(t){let n=normalize(t);return n?quotes.find(q=>normalize(q.text)===n):null}
+function formatDate(s){let p=s.split("-");return p.length===3?p[1]+"/"+p[2]+"/"+p[0]:s}
+function escape(s){let d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
+function saveData(){localStorage.setItem("quoteTrackerData",JSON.stringify(quotes));updateStats()}
+
+function checkQuote(){
+ let text=document.getElementById("checkText").value.trim(),el=document.getElementById("checkResult");
+ if(!text){el.className="result show old";el.innerHTML="<div class='result-title'>Enter a quote</div>";return}
+ let q=findDuplicate(text);
+ if(q){
+  el.className="result show old";
+  el.innerHTML="<div class='result-title'>⚠ Already Posted</div><div class='matched-quote'>“"+escape(q.text)+"”</div><div style='margin-top:10px'><b>Date Posted:</b> "+formatDate(q.date)+(q.author?"<br><b>Author:</b> "+escape(q.author):"")+(q.category?"<br><b>Category:</b> "+escape(q.category):"")+"</div>";
+ }else{
+  el.className="result show new";
+  el.innerHTML="<div class='result-title'>✓ Not Posted Yet</div><div class='matched-quote'>“"+escape(text)+"”</div><div style='margin-top:10px'>No matching quote was found in your saved history.</div>";
+ }
+}
+function clearCheck(){document.getElementById("checkText").value="";document.getElementById("checkResult").className="result"}
+function goAddFromCheck(){let t=document.getElementById("checkText").value.trim();if(!t){toast("Enter a quote first.");return}openAdd();document.getElementById("addQuote").value=t}
+function openAdd(){document.getElementById("addDate").value=today();document.getElementById("addModal").classList.add("show")}
+function closeAdd(){document.getElementById("addModal").classList.remove("show")}
+function addQuote(){
+ let text=document.getElementById("addQuote").value.trim(),date=document.getElementById("addDate").value;if(!text||!date){toast("Quote and date are required.");return}
+ let dup=findDuplicate(text);if(dup&&!confirm("This quote is already recorded from "+formatDate(dup.date)+". Save it again?"))return;
+ quotes.push({id:Date.now()+Math.random(),text,author:document.getElementById("addAuthor").value.trim(),date,category:document.getElementById("addCategory").value.trim(),instagram:document.getElementById("addInstagram").value.trim()});
+ saveData();closeAdd();displayHistory();toast("Quote saved.")
+}
+function displayHistory(){
+ let s=(document.getElementById("search").value||"").toLowerCase().trim();
+ let arr=quotes.filter(q=>q.text.toLowerCase().includes(s)||(q.author||"").toLowerCase().includes(s)||(q.category||"").toLowerCase().includes(s)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+ let list=document.getElementById("historyList");
+ if(!arr.length){list.innerHTML="<div class='card empty'>"+(quotes.length?"No matching quotes.":"No quotes recorded yet.")+"</div>";return}
+ list.innerHTML=arr.map(q=>`<div class="quote"><div class="quote-text">“${escape(q.text)}”</div>${q.author?`<div class="meta">— ${escape(q.author)}</div>`:""}<div class="tags"><span class="tag">Posted: ${formatDate(q.date)}</span>${q.category?`<span class="tag">${escape(q.category)}</span>`:""}</div><div class="buttons"><button class="btn secondary" onclick="editQuote(${q.id})">Edit</button>${q.instagram?`<button class="btn secondary" onclick="window.open('${encodeURI(q.instagram)}','_blank')">Instagram</button>`:""}<button class="btn danger" onclick="deleteQuote(${q.id})">Delete</button></div></div>`).join("")
+}
+function editQuote(id){let q=quotes.find(x=>x.id===id);if(!q)return;document.getElementById("editId").value=q.id;document.getElementById("editQuote").value=q.text;document.getElementById("editAuthor").value=q.author||"";document.getElementById("editDate").value=q.date;document.getElementById("editCategory").value=q.category||"";document.getElementById("editInstagram").value=q.instagram||"";document.getElementById("editModal").classList.add("show")}
+function closeEdit(){document.getElementById("editModal").classList.remove("show")}
+function saveEdit(){
+ let id=Number(document.getElementById("editId").value),text=document.getElementById("editQuote").value.trim(),date=document.getElementById("editDate").value;if(!text||!date){toast("Quote and date are required.");return}
+ let other=quotes.find(q=>q.id!==id&&normalize(q.text)===normalize(text));if(other&&!confirm("Another quote matches this text. Continue?"))return
+ let q=quotes.find(x=>x.id===id);if(!q)return;q.text=text;q.author=document.getElementById("editAuthor").value.trim();q.date=date;q.category=document.getElementById("editCategory").value.trim();q.instagram=document.getElementById("editInstagram").value.trim();saveData();closeEdit();displayHistory();toast("Quote updated.")
+}
+function deleteQuote(id){let q=quotes.find(x=>x.id===id);if(q&&confirm("Delete this quote?\n\n"+q.text)){quotes=quotes.filter(x=>x.id!==id);saveData();displayHistory();toast("Quote deleted.")}}
+function updateStats(){document.getElementById("total").textContent=quotes.length;let d=new Date();document.getElementById("month").textContent=quotes.filter(q=>{let x=new Date(q.date);return x.getMonth()===d.getMonth()&&x.getFullYear()===d.getFullYear()}).length;document.getElementById("categories").textContent=new Set(quotes.map(q=>q.category).filter(Boolean)).size}
+
+function exportData(){if(!quotes.length){toast("No quotes to export.");return}let b=new Blob([JSON.stringify(quotes,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="quote-tracker-backup.json";a.click();toast("Backup exported.")}
+function importData(){let f=document.getElementById("importFile").files[0];if(!f){toast("Choose a backup file.");return}let r=new FileReader();r.onload=e=>{try{let a=JSON.parse(e.target.result);if(!Array.isArray(a))throw 0;let n=0;a.forEach(q=>{if(q.text&&q.date&&!findDuplicate(q.text)){quotes.push({id:Date.now()+Math.random(),text:q.text,author:q.author||"",date:q.date,category:q.category||"",instagram:q.instagram||""});n++}});saveData();displayHistory();toast(n+" quote(s) imported.")}catch{toast("Invalid backup file.")}};r.readAsText(f)}
+function deleteAll(){if(quotes.length&&confirm("Delete all "+quotes.length+" saved quotes?")){quotes=[];saveData();displayHistory();toast("All quotes deleted.")}}
+function toast(msg){let e=document.getElementById("toast");e.textContent=msg;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),2400)}
+
+updateStats();displayHistory();
+</script>
+</body>
+</html>
